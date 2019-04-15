@@ -182,7 +182,10 @@ src/main.d src/main.o: ../src/main.c ../src/asf.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\xlocale.h \
  c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-none-eabi\include\sys\string.h \
  ../src/config/conf_board.h ../src/config/conf_example.h ../src/tfont.h \
- ../src/calibri_36.h
+ ../src/maquina1.h ../src/calibri_36.h ../src/icones/powerbuttonoff.h \
+ ../src/icones/powerbuttonon.h ../src/icones/botao_next.h \
+ ../src/icones/botao_previous.h ../src/icones/unlocked.h \
+ ../src/icones/locked.h
 
 ../src/asf.h:
 
@@ -574,4 +577,18 @@ c:\program\ files\ (x86)\atmel\studio\7.0\toolchain\arm\arm-gnu-toolchain\arm-no
 
 ../src/tfont.h:
 
+../src/maquina1.h:
+
 ../src/calibri_36.h:
+
+../src/icones/powerbuttonoff.h:
+
+../src/icones/powerbuttonon.h:
+
+../src/icones/botao_next.h:
+
+../src/icones/botao_previous.h:
+
+../src/icones/unlocked.h:
+
+../src/icones/locked.h:

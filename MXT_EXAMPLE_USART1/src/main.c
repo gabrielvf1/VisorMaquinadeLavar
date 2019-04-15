@@ -85,14 +85,16 @@
  */
 
 
-#include <asf.h>
+#include "asf.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include "ioport.h"
 #include "conf_board.h"
 #include "conf_example.h"
 #include "conf_uart_serial.h"
 #include "tfont.h"
+#include "maquina1.h"
 #include "calibri_36.h"
 
 #define YEAR        2019
@@ -115,10 +117,28 @@ const uint32_t BUTTON_BORDER = 2;
 const uint32_t BUTTON_X = ILI9488_LCD_WIDTH/2;
 const uint32_t BUTTON_Y = ILI9488_LCD_HEIGHT/2;
 Bool flag_lock = false;
+Bool flag_ligar = true;
 unsigned int hora;
 unsigned int minuto, segundo;
 int lock_seg;
+t_ciclo *p_primeiro;
 char vel_string[32],distancia_string[32],tempo_string[32],segundo_string[32],minuto_string[32],hora_string[32];
+
+typedef struct {
+	const uint8_t *data;
+	uint16_t width;
+	uint16_t height;
+	uint8_t dataSize;
+} tImage2;
+
+ #include "icones/powerbuttonoff.h"
+ #include "icones/powerbuttonon.h"
+ #include "icones/botao_next.h"
+ #include "icones/botao_previous.h"
+ #include "icones/unlocked.h"
+ #include "icones/locked.h"
+ 
+
 	
 static void configure_lcd(void){
 	/* Initialize display parameter */
@@ -141,6 +161,32 @@ void RTC_init(void);
  *
  * \param device Pointer to mxt_device struct
  */
+
+/**
+ * Inicializa ordem do menu
+ * retorna o primeiro ciclo que
+ * deve ser exibido.
+ */
+t_ciclo *initMenuOrder(){
+  c_rapido.previous = &c_enxague;
+  c_rapido.next = &c_diario;
+
+  c_diario.previous = &c_rapido;
+  c_diario.next = &c_pesado;
+
+  c_pesado.previous = &c_diario;
+  c_pesado.next = &c_enxague;
+
+  c_enxague.previous = &c_pesado;
+  c_enxague.next = &c_centrifuga;
+
+  c_centrifuga.previous = &c_enxague;
+  c_centrifuga.next = &c_rapido;
+
+  return(&c_diario);
+}
+
+
 void RTC_Handler(void)
 {
 	uint32_t ul_status = rtc_get_status(RTC);
@@ -284,6 +330,14 @@ void RTC_init(){
 
 }
 
+void write_text(int x, int y,  int tamanho_max_x, int tamanho_max_y , char *text){
+	ili9488_set_foreground_color(COLOR_CONVERT(COLOR_WHITE));
+	ili9488_draw_filled_rectangle(x-2, y-2, tamanho_max_x+2, tamanho_max_y+2);
+	ili9488_set_foreground_color(COLOR_CONVERT(COLOR_BLACK));
+	ili9488_draw_string(x,y,text);
+	
+}
+
 void draw_screen(void) {
 	ili9488_set_foreground_color(COLOR_CONVERT(COLOR_WHITE));
 	ili9488_draw_filled_rectangle(0, 0, ILI9488_LCD_WIDTH-1, ILI9488_LCD_HEIGHT-1);
@@ -293,40 +347,45 @@ void draw_button_liga(uint32_t clicked) {
 	static uint32_t last_state = 255; // undefined
 	if(clicked == last_state) return;
 	
-	ili9488_set_foreground_color(COLOR_CONVERT(COLOR_BLACK));
-	ili9488_draw_filled_rectangle(76, 20, 156, 84);
 	if(clicked) {
-		ili9488_set_foreground_color(COLOR_CONVERT(COLOR_TOMATO));
-		ili9488_draw_filled_rectangle(76, 20, 156,52);
+		write_text(2,2,150,15, "Desligado");
+		ili9488_draw_pixmap(76, 30, powerbuttonoff.width, powerbuttonoff.height, powerbuttonoff.data);
 	} else {
-		ili9488_set_foreground_color(COLOR_CONVERT(COLOR_GREEN));
-		ili9488_draw_filled_rectangle(76, 52, 156, 84);
+		write_text(2,2,150,15, "Ligado");
+		ili9488_draw_pixmap(76, 30, powerbuttonon.width, powerbuttonon.height, powerbuttonon.data);
 	}
 	last_state = clicked;
-}
-
-void write_text(int x, int y,  int tamanho_max_x, int tamanho_max_y , char *text){
-	ili9488_set_foreground_color(COLOR_CONVERT(COLOR_WHITE));
-	ili9488_draw_filled_rectangle(x-2, y-2, tamanho_max_x+2, tamanho_max_y+2);
-	ili9488_set_foreground_color(COLOR_CONVERT(COLOR_BLACK));
-	ili9488_draw_string(x,y,text);
-	
 }
 
 void draw_button_lock(uint32_t flag) {
 	static uint32_t last_state = 255; // undefined
 	if(flag == last_state) return;
 	
-	ili9488_set_foreground_color(COLOR_CONVERT(COLOR_BLACK));
-	ili9488_draw_filled_rectangle(230, 20, 294, 84);
 	if(flag) {
-		write_text(215,2,320,15, "Unlocked");
-		ili9488_set_foreground_color(COLOR_CONVERT(COLOR_TOMATO));
-		ili9488_draw_filled_rectangle(230, 20, 294,84);
+		write_text(220,2,320,15, "Locked");
+		ili9488_draw_pixmap(240, 25, locked.width, locked.height, locked.data);
 		} else {
-		write_text(215,2,320,15, "Locked");
-		ili9488_set_foreground_color(COLOR_CONVERT(COLOR_GREEN));
-		ili9488_draw_filled_rectangle(230, 20, 294, 84);
+		write_text(220,2,320,15, "Unlocked");
+		ili9488_draw_pixmap(240, 25, unlocked.width, unlocked.height, unlocked.data);
+	}
+	last_state = flag;
+}
+
+void draw_button_cicle_previus(uint32_t flag) {
+	static uint32_t last_state = 255; // undefined
+	if(flag == last_state) return;
+	if(flag) {
+			flag = 0;
+		}
+	last_state = flag;
+}
+
+void draw_button_cicle_next(uint32_t flag) {
+	static uint32_t last_state = 255; // undefined
+	if(flag == last_state) return;
+	
+	if(flag) {
+		flag = 0;
 	}
 	last_state = flag;
 }
@@ -364,26 +423,29 @@ void making_border(int x,int y, int x1, int y1){
 }
 
 void update_screen(uint32_t tx, uint32_t ty, uint8_t status) {
-	if(tx >= 100 && tx <= 175) {
-		if(ty >= 20 && ty <= 52 ){
-			draw_button_liga(1);
-			write_text(3,3,198,15,"Desligada");
-
-		} else if(ty > 52 && ty < 84) {
-			draw_button_liga(0);
-			write_text(3,3,198,15,"Ligada");
+	if(status==0x20 && tx >= 85 && tx <= 145) {
+		if(ty >= 115 && ty <= 202 ){
+			p_primeiro = p_primeiro->previous;
+			write_text(90,94,234,105, p_primeiro->nome);
+			draw_button_cicle_previus(1);
 		}
 	}
-	if (status ==0xc0 || status == 0x84 || status){
-		if (tx >= 230 && tx <= 294){
-			if(ty >= 20 && ty <= 84 ){
-				lock_seg = segundo;
-			}
+	if(status==0x20 && tx >= 150 && tx <= 210) {
+		if(ty >= 115 && ty <= 202 ){
+			p_primeiro = p_primeiro->next;
+			write_text(90,94,234,105, p_primeiro->nome);
+			draw_button_cicle_next(1);
 		}
 	}
-	if(status==0x20 && segundo >= lock_seg+3){
-		if (tx >= 230 && tx <= 294){
-			if(ty >= 20 && ty <= 84 ){
+	if(status==0x20 && tx >= 76 && tx <= 125) {
+		if(ty >= 30 && ty <= 78 ){
+			flag_ligar = !flag_ligar;
+			draw_button_liga(flag_ligar);
+		}
+	}
+	if(status==0x20){
+		if (tx >= 240 && tx <= 276){
+			if(ty >= 25 && ty <= 77 ){
 				flag_lock = !flag_lock;
 				draw_button_lock(flag_lock);
 			}
@@ -454,15 +516,21 @@ int main(void)
 	board_init();  /* Initialize board */
 	configure_lcd();
 	draw_screen();
-	write_text(2,2,202,15, "Desligado");
-	write_text(2,92,234,15, "Ciclo:");
-	write_text(215,2,320,15, "Unlocked");
+	p_primeiro = initMenuOrder();
+	write_text(2,2,200,15, "Desligado");
+	write_text(2,94,105, 105, "Ciclo:");
+	write_text(220,2,320,15, "Unlocked");
+	write_text(90,94,234,105, p_primeiro->nome);
 	draw_button_lock(flag_lock);
 	making_border(202,0,204,90);
 	making_border(0,88,320,90);
-	draw_button_liga(1);
-	
-	
+	draw_button_liga(flag_ligar);
+	draw_button_cicle_previus(1);
+	draw_button_cicle_next(1);
+	ili9488_draw_pixmap(150, 115, botao_next.width, botao_next.height, botao_next.data);
+	ili9488_draw_pixmap(85, 115, botao_previous.width, botao_previous.height, botao_previous.data);
+	  
+
 	/* Initialize the mXT touch device */
 	mxt_init(&device);
 	
@@ -470,19 +538,20 @@ int main(void)
 	stdio_serial_init(USART_SERIAL_EXAMPLE, &usart_serial_options);
 
 	printf("\n\rmaXTouch data USART transmitter\n\r");
-		
 
 	while (true) {
-					sprintf(segundo_string,"%d",segundo);
-					ili9488_set_foreground_color(COLOR_CONVERT(COLOR_WHITE));
-					ili9488_draw_filled_rectangle(10, 150, 320,190);
-					font_draw_text(&calibri_36, segundo_string, 105, 150, 1);
-					sprintf(minuto_string,"%d",minuto);
-					font_draw_text(&calibri_36, minuto_string, 52, 150, 1);
-					font_draw_text(&calibri_36, ":", 95, 150, 1);
-					sprintf(hora_string,"%d",hora);
-					font_draw_text(&calibri_36, hora_string, 0, 150, 1);
-					font_draw_text(&calibri_36, ":", 35, 150, 1);
+		printf("%s", p_primeiro->next->nome);
+		/*
+		sprintf(segundo_string,"%d",segundo);
+		ili9488_set_foreground_color(COLOR_CONVERT(COLOR_WHITE));
+		ili9488_draw_filled_rectangle(10, 150, 320,190);
+		font_draw_text(&calibri_36, segundo_string, 105, 150, 1);
+		sprintf(minuto_string,"%d",minuto);
+		font_draw_text(&calibri_36, minuto_string, 52, 150, 1);
+		font_draw_text(&calibri_36, ":", 95, 150, 1);
+		sprintf(hora_string,"%d",hora);
+		font_draw_text(&calibri_36, hora_string, 0, 150, 1);
+			font_draw_text(&calibri_36, ":", 35, 150, 1);
 		/* Check for any pending messages and run message handler if any
 		 * message is found in the queue */
 		if (mxt_is_message_pending(&device)) {
