@@ -3,6 +3,12 @@
 
 typedef struct ciclo t_ciclo;
 
+ #include "icones/diario.h"
+ #include "icones/pesado.h"
+ #include "icones/enxague.h"
+ #include "icones/centrifuga.h"
+ #include "icones/rapido.h"
+ 
 struct ciclo{
 	char nome[32];           // nome do ciclo, para ser exibido
 	int  enxagueTempo;       // tempo que fica em cada enxague
@@ -13,6 +19,7 @@ struct ciclo{
 	char bubblesOn;          // smart bubbles on (???)
 	t_ciclo *previous;
 	t_ciclo *next;
+	tImage2 *icone;
 };
 
 t_ciclo c_rapido = {.nome = "Rapido",
@@ -21,7 +28,8 @@ t_ciclo c_rapido = {.nome = "Rapido",
 	.centrifugacaoRPM = 900,
 	.centrifugacaoTempo = 5,
 	.heavy = 0,
-	.bubblesOn = 1
+	.bubblesOn = 1,
+	.icone = &rapido,
 };
 
 t_ciclo c_diario = {.nome = "Diario",
@@ -31,6 +39,7 @@ t_ciclo c_diario = {.nome = "Diario",
 	.centrifugacaoTempo = 8,
 	.heavy = 0,
 	.bubblesOn = 1,
+	.icone = &diario,
 };
 
 t_ciclo c_pesado = {.nome = "Pesado",
@@ -40,6 +49,7 @@ t_ciclo c_pesado = {.nome = "Pesado",
 	.centrifugacaoTempo = 10,
 	.heavy = 1,
 	.bubblesOn = 1,
+	.icone = &pesado,
 };
 
 t_ciclo c_enxague = {.nome = "Enxague",
@@ -49,6 +59,7 @@ t_ciclo c_enxague = {.nome = "Enxague",
 	.centrifugacaoTempo = 0,
 	.heavy = 0,
 	.bubblesOn = 0,
+	.icone = &enxague,
 };
 
 t_ciclo c_centrifuga = {.nome = "Centrifuga",
@@ -58,6 +69,7 @@ t_ciclo c_centrifuga = {.nome = "Centrifuga",
 	.centrifugacaoTempo = 10,
 	.heavy = 0,
 	.bubblesOn = 0,
+	.icone = &centrifuga,
 };
 
 

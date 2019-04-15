@@ -94,6 +94,14 @@
 #include "conf_example.h"
 #include "conf_uart_serial.h"
 #include "tfont.h"
+
+typedef struct {
+	const uint8_t *data;
+	uint16_t width;
+	uint16_t height;
+	uint8_t dataSize;
+} tImage2;
+
 #include "maquina1.h"
 #include "calibri_36.h"
 
@@ -110,29 +118,37 @@
 
 #define USART_TX_MAX_LENGTH     0xff
 
+#define LED_PIO       PIOA
+#define LED_PIO_ID    ID_PIOA
+#define LED_IDX       0
+#define LED_IDX_MASK  (1u << LED_IDX)
+
+#define BUT1_PIO      PIOC
+#define BUT1_PIO_ID   ID_PIOC
+#define BUT1_IDX  31
+#define BUT1_IDX_MASK (1 << BUT1_IDX)
+
 struct ili9488_opt_t g_ili9488_display_opt;
 const uint32_t BUTTON_W = 120;
 const uint32_t BUTTON_H = 150;
 const uint32_t BUTTON_BORDER = 2;
 const uint32_t BUTTON_X = ILI9488_LCD_WIDTH/2;
 const uint32_t BUTTON_Y = ILI9488_LCD_HEIGHT/2;
-Bool flag_lock = false;
-Bool flag_ligar = true;
+volatile Bool flag_lock = false;
+volatile Bool flag_ligar = false;
+volatile Bool porta_flag=false;
+volatile Bool flag_porta_lock = false;
+bool locking_flag=0;
 unsigned int hora;
 unsigned int minuto, segundo;
+unsigned int segundo_lock = 0;
 int lock_seg;
 t_ciclo *p_primeiro;
 char vel_string[32],distancia_string[32],tempo_string[32],segundo_string[32],minuto_string[32],hora_string[32],tempo_total_seg_string[32],tempo_total_min_string[32],tempo_total_hora_string[32];
 int tempo_total_seg = 0;
 int tempo_total_min = 0;
 int tempo_total_hora = 0;
-
-typedef struct {
-	const uint8_t *data;
-	uint16_t width;
-	uint16_t height;
-	uint8_t dataSize;
-} tImage2;
+int contador_icone = 0;
 
  #include "icones/powerbuttonoff.h"
  #include "icones/powerbuttonon.h"
@@ -140,8 +156,12 @@ typedef struct {
  #include "icones/botao_previous.h"
  #include "icones/unlocked.h"
  #include "icones/locked.h"
+ #include "icones/trabalhando1.h"
+ #include "icones/trabalhando2.h"
  
+void io_init(void);
 
+void RTC_init(void);
 	
 static void configure_lcd(void){
 	/* Initialize display parameter */
@@ -154,22 +174,6 @@ static void configure_lcd(void){
 	ili9488_init(&g_ili9488_display_opt);
 }
 
-void RTC_init(void);
-
-/**
- * \brief Set maXTouch configuration
- *
- * This function writes a set of predefined, optimal maXTouch configuration data
- * to the maXTouch Xplained Pro.
- *
- * \param device Pointer to mxt_device struct
- */
-
-/**
- * Inicializa ordem do menu
- * retorna o primeiro ciclo que
- * deve ser exibido.
- */
 t_ciclo *initMenuOrder(){
   c_rapido.previous = &c_enxague;
   c_rapido.next = &c_diario;
@@ -189,7 +193,6 @@ t_ciclo *initMenuOrder(){
   return(&c_diario);
 }
 
-
 void RTC_Handler(void)
 {
 	uint32_t ul_status = rtc_get_status(RTC);
@@ -199,36 +202,32 @@ void RTC_Handler(void)
 	*  na interrupcao, se foi por segundo
 	*  ou Alarm
 	*/
-		if ((ul_status & RTC_SR_SEC) == RTC_SR_SEC) {
-			rtc_clear_status(RTC, RTC_SCCR_SECCLR);
-			segundo +=1;
-			if(segundo >= 59){
-				ili9488_set_foreground_color(COLOR_CONVERT(COLOR_WHITE));
-				ili9488_draw_filled_rectangle(0, 257, 320,294);
-				minuto+=1;
-				segundo = 0;
-				if(minuto >=59){
-					hora+=1;
-					minuto = 0;
-				}		
-			}
+	if ((ul_status & RTC_SR_SEC) == RTC_SR_SEC) {
+		rtc_clear_status(RTC, RTC_SCCR_SECCLR);
+		segundo +=1;
+		segundo_lock += 1;
+		if(segundo >= 59){
+			ili9488_set_foreground_color(COLOR_CONVERT(COLOR_WHITE));
+			ili9488_draw_filled_rectangle(0, 257, 320,294);
+			minuto+=1;
+			segundo = 0;
+			if(minuto >=59){
+				hora+=1;
+				minuto = 0;
+			}		
 		}
-	
-	
+	}	
 	/* Time or date alarm */
 	if ((ul_status & RTC_SR_ALARM) == RTC_SR_ALARM) {
 			rtc_clear_status(RTC, RTC_SCCR_ALRCLR);
-		
-
 	}
-		
 	rtc_clear_status(RTC, RTC_SCCR_ACKCLR);
 	rtc_clear_status(RTC, RTC_SCCR_TIMCLR);
 	rtc_clear_status(RTC, RTC_SCCR_CALCLR);
 	rtc_clear_status(RTC, RTC_SCCR_TDERRCLR);
 	
 }
-	
+
 static void mxt_init(struct mxt_device *device)
 {
 	enum status_code status;
@@ -353,11 +352,12 @@ void draw_button_liga(uint32_t clicked) {
 	static uint32_t last_state = 255; // undefined
 	if(clicked == last_state) return;
 	
-	if(clicked) {
+	if(!clicked) {
 		write_text(2,2,150,15, "Desligado");
 		ili9488_draw_pixmap(76, 30, powerbuttonoff.width, powerbuttonoff.height, powerbuttonoff.data);
 	} else {
 		write_text(2,2,150,15, "Ligado");
+		write_text(40,360,320,380, "Lavagem em Progresso");
 		ili9488_draw_pixmap(76, 30, powerbuttonon.width, powerbuttonon.height, powerbuttonon.data);
 	}
 	last_state = clicked;
@@ -381,6 +381,24 @@ void draw_button_cicle_previus(uint32_t flag) {
 	static uint32_t last_state = 255; // undefined
 	if(flag == last_state) return;
 	if(flag) {
+			p_primeiro = p_primeiro->previous;
+			write_text(90,94,234,105, p_primeiro->nome);
+			
+			tempo_total_min = (p_primeiro->enxagueTempo*p_primeiro->enxagueQnt)+p_primeiro->centrifugacaoTempo;
+			tempo_total_hora = (tempo_total_min / 60);
+			tempo_total_min = tempo_total_min % 60;
+			
+			sprintf(tempo_total_seg_string,"%d",tempo_total_seg);
+			write_text(290,216,315,232, tempo_total_seg_string);
+					
+			sprintf(tempo_total_min_string,"%d",tempo_total_min);
+			write_text(258,216,281,232, tempo_total_min_string);
+			write_text(282,216,283,232,":");
+			
+			sprintf(tempo_total_hora_string,"%d",tempo_total_hora);
+			write_text(221,216,246,232, tempo_total_hora_string);
+			write_text(246,216,248,232,":");
+			ili9488_draw_pixmap(200, 115, p_primeiro->icone->width, p_primeiro->icone->height, p_primeiro->icone->data);
 			flag = 0;
 		}
 	last_state = flag;
@@ -389,8 +407,25 @@ void draw_button_cicle_previus(uint32_t flag) {
 void draw_button_cicle_next(uint32_t flag) {
 	static uint32_t last_state = 255; // undefined
 	if(flag == last_state) return;
-	
 	if(flag) {
+		p_primeiro = p_primeiro->next;
+		write_text(90,94,234,105, p_primeiro->nome);
+		
+		tempo_total_min = (p_primeiro->enxagueTempo*p_primeiro->enxagueQnt)+p_primeiro->centrifugacaoTempo;
+		tempo_total_hora = (tempo_total_min / 60);
+		tempo_total_min = tempo_total_min % 60;
+		
+		sprintf(tempo_total_seg_string,"%d",tempo_total_seg);
+		write_text(290,216,315,232, tempo_total_seg_string);
+		
+		sprintf(tempo_total_min_string,"%d",tempo_total_min);
+		write_text(258,216,281,232, tempo_total_min_string);
+		write_text(282,216,283,232,":");
+		
+		sprintf(tempo_total_hora_string,"%d",tempo_total_hora);
+		write_text(221,216,246,232, tempo_total_hora_string);
+		write_text(246,216,248,232,":");
+		ili9488_draw_pixmap(200, 115, p_primeiro->icone->width, p_primeiro->icone->height, p_primeiro->icone->data);
 		flag = 0;
 	}
 	last_state = flag;
@@ -439,54 +474,29 @@ void print_tempo(){
 	font_draw_text(&calibri_36, ":", 125, 258, 1);
 }
 
+void but1_callBack(){
+	if(!flag_ligar){
+		if (flag_porta_lock){
+			pio_clear(LED_PIO,LED_IDX_MASK);
+		}else{
+			pio_set(LED_PIO,LED_IDX_MASK);
+		}
+		flag_porta_lock = !flag_porta_lock;	
+	}
+}
+
 void update_screen(uint32_t tx, uint32_t ty, uint8_t status) {
-	if(status==0x20 && tx >= 85 && tx <= 145 && flag_lock==false  && flag_ligar==true) {
-		if(ty >= 115 && ty <= 202 ){
-			p_primeiro = p_primeiro->previous;
-			write_text(90,94,234,105, p_primeiro->nome);
-			
-			tempo_total_min = (p_primeiro->enxagueTempo*p_primeiro->enxagueQnt)+p_primeiro->centrifugacaoTempo;
-			tempo_total_hora = (tempo_total_min / 60);
-			tempo_total_min = tempo_total_min % 60;
-			
-			sprintf(tempo_total_seg_string,"%d",tempo_total_seg);
-			write_text(290,216,315,232, tempo_total_seg_string);
-			
-			sprintf(tempo_total_min_string,"%d",tempo_total_min);
-			write_text(258,216,281,232, tempo_total_min_string);
-			write_text(282,216,283,232,":");
-			
-			sprintf(tempo_total_hora_string,"%d",tempo_total_hora);
-			write_text(221,216,246,232, tempo_total_hora_string);
-			write_text(246,216,248,232,":");	
-			
+	if(status==0x20 && tx >= 20 && tx <= 80 && flag_lock==false  && flag_ligar==false) {
+		if(ty >= 115 && ty <= 202 ){			
 			draw_button_cicle_previus(1);
 		}
 	}
-	if(status==0x20 && tx >= 150 && tx <= 210 && flag_lock==false && flag_ligar==true) {
+	if(status==0x20 && tx >= 85 && tx <= 145 && flag_lock==false && flag_ligar==false) {
 		if(ty >= 115 && ty <= 202 ){
-			p_primeiro = p_primeiro->next;
-			write_text(90,94,234,105, p_primeiro->nome);
-			
-			tempo_total_min = (p_primeiro->enxagueTempo*p_primeiro->enxagueQnt)+p_primeiro->centrifugacaoTempo;
-			tempo_total_hora = (tempo_total_min / 60);
-			tempo_total_min = tempo_total_min % 60;
-			
-			sprintf(tempo_total_seg_string,"%d",tempo_total_seg);
-			write_text(290,216,315,232, tempo_total_seg_string);
-			
-			sprintf(tempo_total_min_string,"%d",tempo_total_min);
-			write_text(258,216,281,232, tempo_total_min_string);
-			write_text(282,216,283,232,":");
-				
-			sprintf(tempo_total_hora_string,"%d",tempo_total_hora);
-			write_text(221,216,246,232, tempo_total_hora_string);
-			write_text(246,216,248,232,":");
-			
-			draw_button_cicle_next(1);
+			draw_button_cicle_next(1);			
 		}
 	}
-	if(status==0x20 && tx >= 76 && tx <= 125 && flag_lock==false) {
+	if(status==0x20 && tx >= 76 && tx <= 125 && flag_lock==false && flag_porta_lock == false) {
 		if(ty >= 30 && ty <= 78 ){
 			flag_ligar = !flag_ligar;
 			segundo = 0;
@@ -497,14 +507,27 @@ void update_screen(uint32_t tx, uint32_t ty, uint8_t status) {
 			draw_button_liga(flag_ligar);
 		}
 	}
-	if(status==0x20){
-		if (tx >= 240 && tx <= 276){
-			if(ty >= 25 && ty <= 77 ){
+	if (tx >= 230 && tx <= 294){
+		if(ty >= 20 && ty <= 84 ){
+			if ((status ==0xc0 || status == 0x84 || status == 0x94) && locking_flag == false){
+				//printf("AAAAAAAA");
+				locking_flag = true;
+				lock_seg = segundo_lock;
+			}
+		}
+	}
+	if(status==0x20 && segundo_lock >= lock_seg+3){
+		//printf("BBBBBBBBB");
+		if (tx >= 230 && tx <= 294){
+			if(ty >= 20 && ty <= 84 ){
 				flag_lock = !flag_lock;
+				locking_flag = false;
+				segundo_lock = 0;
 				draw_button_lock(flag_lock);
 			}
 		}
 	}
+	
 }
 
 void mxt_handler(struct mxt_device *device)
@@ -551,6 +574,26 @@ void mxt_handler(struct mxt_device *device)
 	}
 }
 
+void io_init(void){
+	/* led */
+	pmc_enable_periph_clk(LED_PIO_ID);
+	pio_configure(LED_PIO, PIO_OUTPUT_0, LED_IDX_MASK, PIO_DEFAULT);
+	
+	//pmc_enable_periph_clk(BUT1_PIO_ID);
+	pio_configure(BUT1_PIO, PIO_INPUT, BUT1_IDX_MASK, PIO_PULLUP | PIO_DEBOUNCE);
+	
+	pio_handler_set(BUT1_PIO,
+	BUT1_PIO_ID,
+	BUT1_IDX_MASK,
+	PIO_IT_FALL_EDGE,
+	but1_callBack);
+	
+	pio_enable_interrupt(BUT1_PIO, BUT1_IDX_MASK);
+	
+	NVIC_EnableIRQ(BUT1_PIO_ID);
+	NVIC_SetPriority(BUT1_PIO_ID, 4);
+}
+
 int main(void)
 {
 	struct mxt_device device; /* Device data container */
@@ -568,10 +611,9 @@ int main(void)
 	board_init();  /* Initialize board */
 	configure_lcd();
 	draw_screen();
+	io_init();
 	p_primeiro = initMenuOrder();
-	
-	
-	
+		
 	tempo_total_min = (p_primeiro->enxagueTempo*p_primeiro->enxagueQnt)+p_primeiro->centrifugacaoTempo;
 	tempo_total_hora = (tempo_total_min / 60);
 	tempo_total_min = tempo_total_min % 60;
@@ -602,8 +644,10 @@ int main(void)
 	draw_button_liga(flag_ligar);
 	draw_button_cicle_previus(1);
 	draw_button_cicle_next(1);
-	ili9488_draw_pixmap(150, 115, botao_next.width, botao_next.height, botao_next.data);
-	ili9488_draw_pixmap(85, 115, botao_previous.width, botao_previous.height, botao_previous.data);
+	ili9488_draw_pixmap(85, 115, botao_next.width, botao_next.height, botao_next.data);
+	ili9488_draw_pixmap(20, 115, botao_previous.width, botao_previous.height, botao_previous.data);
+	ili9488_draw_pixmap(200, 115, p_primeiro->icone->width, p_primeiro->icone->height, p_primeiro->icone->data);
+
 	  
 
 	/* Initialize the mXT touch device */
@@ -618,16 +662,21 @@ int main(void)
 		if (mxt_is_message_pending(&device)) {
 			mxt_handler(&device);
 		}
-		if (!flag_ligar){
+		if (flag_ligar){
 			print_tempo();
+			if(segundo%2==0){
+				ili9488_draw_pixmap(120, 380, trabalhando1.width, trabalhando1.height, trabalhando1.data);
+			}else{
+				ili9488_draw_pixmap(120, 380, trabalhando2.width, trabalhando2.height, trabalhando2.data);
+			}
 		}else{
+			ili9488_set_foreground_color(COLOR_CONVERT(COLOR_WHITE));
+			ili9488_draw_filled_rectangle(0, 380, 320,480);
 			segundo = 0;
 			minuto = 0;
 			hora = 0;
 			print_tempo();
 		}
-		
 	}
-
 	return 0;
 }

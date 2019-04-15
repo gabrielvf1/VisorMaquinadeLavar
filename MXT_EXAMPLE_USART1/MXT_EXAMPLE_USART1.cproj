@@ -697,16 +697,37 @@
     <Compile Include="src\icones\botao_previous.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="src\icones\centrifuga.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\icones\diario.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\icones\enxague.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="src\icones\lavagens.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\icones\locked.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="src\icones\pesado.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="src\icones\powerbuttonoff.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\icones\powerbuttonon.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\icones\rapido.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\icones\trabalhando1.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="src\icones\trabalhando2.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="src\icones\unlocked.h">
