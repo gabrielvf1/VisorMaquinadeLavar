@@ -122,7 +122,10 @@ unsigned int hora;
 unsigned int minuto, segundo;
 int lock_seg;
 t_ciclo *p_primeiro;
-char vel_string[32],distancia_string[32],tempo_string[32],segundo_string[32],minuto_string[32],hora_string[32];
+char vel_string[32],distancia_string[32],tempo_string[32],segundo_string[32],minuto_string[32],hora_string[32],tempo_total_seg_string[32],tempo_total_min_string[32],tempo_total_hora_string[32];
+int tempo_total_seg = 0;
+int tempo_total_min = 0;
+int tempo_total_hora = 0;
 
 typedef struct {
 	const uint8_t *data;
@@ -196,10 +199,12 @@ void RTC_Handler(void)
 	*  na interrupcao, se foi por segundo
 	*  ou Alarm
 	*/
-	if ((ul_status & RTC_SR_SEC) == RTC_SR_SEC) {
-		rtc_clear_status(RTC, RTC_SCCR_SECCLR);
+		if ((ul_status & RTC_SR_SEC) == RTC_SR_SEC) {
+			rtc_clear_status(RTC, RTC_SCCR_SECCLR);
 			segundo +=1;
 			if(segundo >= 59){
+				ili9488_set_foreground_color(COLOR_CONVERT(COLOR_WHITE));
+				ili9488_draw_filled_rectangle(0, 257, 320,294);
 				minuto+=1;
 				segundo = 0;
 				if(minuto >=59){
@@ -207,7 +212,8 @@ void RTC_Handler(void)
 					minuto = 0;
 				}		
 			}
-	}
+		}
+	
 	
 	/* Time or date alarm */
 	if ((ul_status & RTC_SR_ALARM) == RTC_SR_ALARM) {
@@ -422,24 +428,72 @@ void making_border(int x,int y, int x1, int y1){
 	
 }
 
+void print_tempo(){
+	sprintf(segundo_string,"%d",segundo);
+	font_draw_text(&calibri_36, segundo_string, 195, 258, 1);
+	sprintf(minuto_string,"%d",minuto);
+	font_draw_text(&calibri_36, minuto_string, 142, 258, 1);
+	font_draw_text(&calibri_36, ":", 185, 258, 1);
+	sprintf(hora_string,"%d",hora);
+	font_draw_text(&calibri_36, hora_string, 90, 258, 1);
+	font_draw_text(&calibri_36, ":", 125, 258, 1);
+}
+
 void update_screen(uint32_t tx, uint32_t ty, uint8_t status) {
-	if(status==0x20 && tx >= 85 && tx <= 145) {
+	if(status==0x20 && tx >= 85 && tx <= 145 && flag_lock==false  && flag_ligar==true) {
 		if(ty >= 115 && ty <= 202 ){
 			p_primeiro = p_primeiro->previous;
 			write_text(90,94,234,105, p_primeiro->nome);
+			
+			tempo_total_min = (p_primeiro->enxagueTempo*p_primeiro->enxagueQnt)+p_primeiro->centrifugacaoTempo;
+			tempo_total_hora = (tempo_total_min / 60);
+			tempo_total_min = tempo_total_min % 60;
+			
+			sprintf(tempo_total_seg_string,"%d",tempo_total_seg);
+			write_text(290,216,315,232, tempo_total_seg_string);
+			
+			sprintf(tempo_total_min_string,"%d",tempo_total_min);
+			write_text(258,216,281,232, tempo_total_min_string);
+			write_text(282,216,283,232,":");
+			
+			sprintf(tempo_total_hora_string,"%d",tempo_total_hora);
+			write_text(221,216,246,232, tempo_total_hora_string);
+			write_text(246,216,248,232,":");	
+			
 			draw_button_cicle_previus(1);
 		}
 	}
-	if(status==0x20 && tx >= 150 && tx <= 210) {
+	if(status==0x20 && tx >= 150 && tx <= 210 && flag_lock==false && flag_ligar==true) {
 		if(ty >= 115 && ty <= 202 ){
 			p_primeiro = p_primeiro->next;
 			write_text(90,94,234,105, p_primeiro->nome);
+			
+			tempo_total_min = (p_primeiro->enxagueTempo*p_primeiro->enxagueQnt)+p_primeiro->centrifugacaoTempo;
+			tempo_total_hora = (tempo_total_min / 60);
+			tempo_total_min = tempo_total_min % 60;
+			
+			sprintf(tempo_total_seg_string,"%d",tempo_total_seg);
+			write_text(290,216,315,232, tempo_total_seg_string);
+			
+			sprintf(tempo_total_min_string,"%d",tempo_total_min);
+			write_text(258,216,281,232, tempo_total_min_string);
+			write_text(282,216,283,232,":");
+				
+			sprintf(tempo_total_hora_string,"%d",tempo_total_hora);
+			write_text(221,216,246,232, tempo_total_hora_string);
+			write_text(246,216,248,232,":");
+			
 			draw_button_cicle_next(1);
 		}
 	}
-	if(status==0x20 && tx >= 76 && tx <= 125) {
+	if(status==0x20 && tx >= 76 && tx <= 125 && flag_lock==false) {
 		if(ty >= 30 && ty <= 78 ){
 			flag_ligar = !flag_ligar;
+			segundo = 0;
+			minuto = 0;
+			hora = 0;
+			ili9488_set_foreground_color(COLOR_CONVERT(COLOR_WHITE));
+			ili9488_draw_filled_rectangle(0, 257, 320,294);
 			draw_button_liga(flag_ligar);
 		}
 	}
@@ -497,8 +551,6 @@ void mxt_handler(struct mxt_device *device)
 	}
 }
 
-
-
 int main(void)
 {
 	struct mxt_device device; /* Device data container */
@@ -517,6 +569,24 @@ int main(void)
 	configure_lcd();
 	draw_screen();
 	p_primeiro = initMenuOrder();
+	
+	
+	
+	tempo_total_min = (p_primeiro->enxagueTempo*p_primeiro->enxagueQnt)+p_primeiro->centrifugacaoTempo;
+	tempo_total_hora = (tempo_total_min / 60);
+	tempo_total_min = tempo_total_min % 60;
+	
+	sprintf(tempo_total_seg_string,"%d",tempo_total_seg);
+	write_text(290,216,315,232, tempo_total_seg_string);
+	
+	sprintf(tempo_total_min_string,"%d",tempo_total_min);
+	write_text(258,216,281,232, tempo_total_min_string);
+	write_text(282,216,283,232,":");
+	
+	sprintf(tempo_total_hora_string,"%d",tempo_total_hora);
+	write_text(221,216,246,232, tempo_total_hora_string);
+	write_text(246,216,248,232,":");
+		
 	write_text(2,2,200,15, "Desligado");
 	write_text(2,94,105, 105, "Ciclo:");
 	write_text(220,2,320,15, "Unlocked");
@@ -524,6 +594,11 @@ int main(void)
 	draw_button_lock(flag_lock);
 	making_border(202,0,204,90);
 	making_border(0,88,320,90);
+	making_border(0,210 ,320 ,212);
+	making_border(0,236 ,320 ,238);
+	making_border(0,295 ,320 ,297);
+	write_text(0,216,320,232, "Tempo Total Ciclo:");
+	write_text(0,240,320,256, "Tempo Decorrido do Ciclo:");
 	draw_button_liga(flag_ligar);
 	draw_button_cicle_previus(1);
 	draw_button_cicle_next(1);
@@ -540,22 +615,16 @@ int main(void)
 	printf("\n\rmaXTouch data USART transmitter\n\r");
 
 	while (true) {
-		printf("%s", p_primeiro->next->nome);
-		/*
-		sprintf(segundo_string,"%d",segundo);
-		ili9488_set_foreground_color(COLOR_CONVERT(COLOR_WHITE));
-		ili9488_draw_filled_rectangle(10, 150, 320,190);
-		font_draw_text(&calibri_36, segundo_string, 105, 150, 1);
-		sprintf(minuto_string,"%d",minuto);
-		font_draw_text(&calibri_36, minuto_string, 52, 150, 1);
-		font_draw_text(&calibri_36, ":", 95, 150, 1);
-		sprintf(hora_string,"%d",hora);
-		font_draw_text(&calibri_36, hora_string, 0, 150, 1);
-			font_draw_text(&calibri_36, ":", 35, 150, 1);
-		/* Check for any pending messages and run message handler if any
-		 * message is found in the queue */
 		if (mxt_is_message_pending(&device)) {
 			mxt_handler(&device);
+		}
+		if (!flag_ligar){
+			print_tempo();
+		}else{
+			segundo = 0;
+			minuto = 0;
+			hora = 0;
+			print_tempo();
 		}
 		
 	}
