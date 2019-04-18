@@ -138,6 +138,7 @@ volatile Bool flag_lock = false;
 volatile Bool flag_ligar = false;
 volatile Bool porta_flag=false;
 volatile Bool flag_porta_lock = false;
+volatile Bool flag_apaga_tela = false;
 bool locking_flag=0;
 unsigned int hora;
 unsigned int minuto, segundo;
@@ -149,6 +150,10 @@ int tempo_total_seg = 0;
 int tempo_total_min = 0;
 int tempo_total_hora = 0;
 int contador_icone = 0;
+int segundo_cd = 0;
+int minuto_cd = 0;
+int hora_cd = 0;
+
 
  #include "icones/powerbuttonoff.h"
  #include "icones/powerbuttonon.h"
@@ -192,7 +197,9 @@ t_ciclo *initMenuOrder(){
 
   return(&c_diario);
 }
-
+apagaga_tempo(){
+	
+}
 void RTC_Handler(void)
 {
 	uint32_t ul_status = rtc_get_status(RTC);
@@ -204,11 +211,23 @@ void RTC_Handler(void)
 	*/
 	if ((ul_status & RTC_SR_SEC) == RTC_SR_SEC) {
 		rtc_clear_status(RTC, RTC_SCCR_SECCLR);
+		if(flag_ligar){
+			segundo_cd-=1;
+			if (segundo_cd==9){
+				flag_apaga_tela = true;
+			}
+			if(segundo_cd<0){
+				minuto_cd-=1;
+				segundo_cd=59;
+				if(minuto_cd<=1){
+					hora_cd-=1;
+					minuto_cd=59;
+				}
+			}
+		}
 		segundo +=1;
 		segundo_lock += 1;
 		if(segundo >= 59){
-			ili9488_set_foreground_color(COLOR_CONVERT(COLOR_WHITE));
-			ili9488_draw_filled_rectangle(0, 257, 320,294);
 			minuto+=1;
 			segundo = 0;
 			if(minuto >=59){
@@ -381,6 +400,7 @@ void draw_button_cicle_previus(uint32_t flag) {
 	static uint32_t last_state = 255; // undefined
 	if(flag == last_state) return;
 	if(flag) {
+			
 			p_primeiro = p_primeiro->previous;
 			write_text(90,94,234,105, p_primeiro->nome);
 			
@@ -464,21 +484,39 @@ void making_border(int x,int y, int x1, int y1){
 }
 
 void print_tempo(){
-	sprintf(segundo_string,"%d",segundo);
-	font_draw_text(&calibri_36, segundo_string, 195, 258, 1);
-	sprintf(minuto_string,"%d",minuto);
-	font_draw_text(&calibri_36, minuto_string, 142, 258, 1);
-	font_draw_text(&calibri_36, ":", 185, 258, 1);
-	sprintf(hora_string,"%d",hora);
-	font_draw_text(&calibri_36, hora_string, 90, 258, 1);
-	font_draw_text(&calibri_36, ":", 125, 258, 1);
+	if(flag_ligar){
+		if(flag_apaga_tela){
+			flag_apaga_tela = false;
+			ili9488_set_foreground_color(COLOR_CONVERT(COLOR_WHITE));
+			ili9488_draw_filled_rectangle(0, 257, 320,294);
+		}
+		sprintf(segundo_string,"%d",segundo_cd);
+		font_draw_text(&calibri_36, segundo_string, 195, 258, 1);
+		sprintf(minuto_string,"%d",minuto_cd);
+		font_draw_text(&calibri_36, minuto_string, 142, 258, 1);
+		font_draw_text(&calibri_36, ":", 185, 258, 1);
+		sprintf(hora_string,"%d",hora_cd);
+		font_draw_text(&calibri_36, hora_string, 90, 258, 1);
+		font_draw_text(&calibri_36, ":", 125, 258, 1);
+	}else{
+		sprintf(segundo_string,"%d",segundo);
+		font_draw_text(&calibri_36, segundo_string, 195, 258, 1);
+		sprintf(minuto_string,"%d",minuto);
+		font_draw_text(&calibri_36, minuto_string, 142, 258, 1);
+		font_draw_text(&calibri_36, ":", 185, 258, 1);
+		sprintf(hora_string,"%d",hora);
+		font_draw_text(&calibri_36, hora_string, 90, 258, 1);
+		font_draw_text(&calibri_36, ":", 125, 258, 1);
+	}
 }
 
 void but1_callBack(){
 	if(!flag_ligar){
 		if (flag_porta_lock){
+			write_text(2,300,320,320,"Porta Fechada");
 			pio_clear(LED_PIO,LED_IDX_MASK);
 		}else{
+			write_text(2,300,320,320,"Porta Aberta");
 			pio_set(LED_PIO,LED_IDX_MASK);
 		}
 		flag_porta_lock = !flag_porta_lock;	
@@ -499,9 +537,17 @@ void update_screen(uint32_t tx, uint32_t ty, uint8_t status) {
 	if(status==0x20 && tx >= 76 && tx <= 125 && flag_lock==false && flag_porta_lock == false) {
 		if(ty >= 30 && ty <= 78 ){
 			flag_ligar = !flag_ligar;
-			segundo = 0;
-			minuto = 0;
-			hora = 0;
+			segundo_cd = tempo_total_seg;
+			minuto_cd = tempo_total_min;
+			hora_cd = tempo_total_hora;
+			if (hora_cd>0){
+				minuto_cd = 59;
+				segundo_cd = 59;
+				tempo_total_hora-=1;
+			}else if(tempo_total_min>0){
+				segundo_cd=59;
+				minuto_cd-=1;
+			}
 			ili9488_set_foreground_color(COLOR_CONVERT(COLOR_WHITE));
 			ili9488_draw_filled_rectangle(0, 257, 320,294);
 			draw_button_liga(flag_ligar);
@@ -633,6 +679,7 @@ int main(void)
 	write_text(2,94,105, 105, "Ciclo:");
 	write_text(220,2,320,15, "Unlocked");
 	write_text(90,94,234,105, p_primeiro->nome);
+	write_text(2,300,320,320,"Porta Aberta");
 	draw_button_lock(flag_lock);
 	making_border(202,0,204,90);
 	making_border(0,88,320,90);
@@ -640,7 +687,7 @@ int main(void)
 	making_border(0,236 ,320 ,238);
 	making_border(0,295 ,320 ,297);
 	write_text(0,216,320,232, "Tempo Total Ciclo:");
-	write_text(0,240,320,256, "Tempo Decorrido do Ciclo:");
+	write_text(0,240,320,256, "Tempo Restante do Ciclo:");
 	draw_button_liga(flag_ligar);
 	draw_button_cicle_previus(1);
 	draw_button_cicle_next(1);
@@ -663,15 +710,25 @@ int main(void)
 			mxt_handler(&device);
 		}
 		if (flag_ligar){
-			print_tempo();
-			if(segundo%2==0){
-				ili9488_draw_pixmap(120, 380, trabalhando1.width, trabalhando1.height, trabalhando1.data);
+			if(tempo_total_min == minuto && tempo_total_hora == hora && tempo_total_seg == segundo){
+				flag_ligar = 0;
+				minuto = 0;
+				segundo = 0;
+				hora = 0;
+				print_tempo();
+				draw_button_liga(flag_ligar);
+				
 			}else{
-				ili9488_draw_pixmap(120, 380, trabalhando2.width, trabalhando2.height, trabalhando2.data);
+				print_tempo();
+				if(segundo%2==0){
+					ili9488_draw_pixmap(120, 380, trabalhando1.width, trabalhando1.height, trabalhando1.data);
+					}else{
+					ili9488_draw_pixmap(120, 380, trabalhando2.width, trabalhando2.height, trabalhando2.data);
+				}
 			}
 		}else{
 			ili9488_set_foreground_color(COLOR_CONVERT(COLOR_WHITE));
-			ili9488_draw_filled_rectangle(0, 380, 320,480);
+			ili9488_draw_filled_rectangle(0, 322, 320,480);
 			segundo = 0;
 			minuto = 0;
 			hora = 0;
