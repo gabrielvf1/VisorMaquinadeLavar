@@ -94,6 +94,14 @@
 #include "conf_example.h"
 #include "conf_uart_serial.h"
 #include "tfont.h"
+ #include "icones/powerbuttonoff.h"
+ #include "icones/powerbuttonon.h"
+ #include "icones/botao_next.h"
+ #include "icones/botao_previous.h"
+ #include "icones/unlocked.h"
+ #include "icones/locked.h"
+ #include "icones/trabalhando1.h"
+ #include "icones/trabalhando2.h"
 
 typedef struct {
 	const uint8_t *data;
@@ -158,16 +166,6 @@ int contador_icone = 0;
 int segundo_cd = 0;
 int minuto_cd = 0;
 int hora_cd = 0;
-
-
- #include "icones/powerbuttonoff.h"
- #include "icones/powerbuttonon.h"
- #include "icones/botao_next.h"
- #include "icones/botao_previous.h"
- #include "icones/unlocked.h"
- #include "icones/locked.h"
- #include "icones/trabalhando1.h"
- #include "icones/trabalhando2.h"
  
 void io_init(void);
 
