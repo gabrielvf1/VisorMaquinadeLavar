@@ -150,7 +150,7 @@ unsigned int minuto, segundo;
 unsigned int segundo_lock = 0;
 int lock_seg;
 t_ciclo *p_primeiro;
-char vel_string[32],distancia_string[32],tempo_string[32],segundo_string[32],minuto_string[32],hora_string[32],tempo_total_seg_string[32],tempo_total_min_string[32],tempo_total_hora_string[32];
+char tempo_string[32],segundo_string[32],minuto_string[32],hora_string[32],tempo_total_seg_string[32],tempo_total_min_string[32],tempo_total_hora_string[32];
 int tempo_total_seg = 0;
 int tempo_total_min = 0;
 int tempo_total_hora = 0;
