@@ -94,6 +94,8 @@
 #include "conf_example.h"
 #include "conf_uart_serial.h"
 #include "tfont.h"
+
+//Testar
  #include "icones/powerbuttonoff.h"
  #include "icones/powerbuttonon.h"
  #include "icones/botao_next.h"
