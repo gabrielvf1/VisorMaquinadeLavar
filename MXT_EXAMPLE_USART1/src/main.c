@@ -128,6 +128,11 @@ typedef struct {
 #define BUT1_IDX  31
 #define BUT1_IDX_MASK (1 << BUT1_IDX)
 
+*define CLICOU 0x20
+*define SOLTOU_1 0x84
+*define SOLTOU_2 0x94
+*define SOLTOU_3 0xc0
+	
 struct ili9488_opt_t g_ili9488_display_opt;
 const uint32_t BUTTON_W = 120;
 const uint32_t BUTTON_H = 150;
@@ -524,17 +529,17 @@ void but1_callBack(){
 }
 
 void update_screen(uint32_t tx, uint32_t ty, uint8_t status) {
-	if(status==0x20 && tx >= 20 && tx <= 80 && flag_lock==false  && flag_ligar==false) {
+	if(status==CLICOU && tx >= 20 && tx <= 80 && flag_lock==false  && flag_ligar==false) {
 		if(ty >= 115 && ty <= 202 ){			
 			draw_button_cicle_previus(1);
 		}
 	}
-	if(status==0x20 && tx >= 85 && tx <= 145 && flag_lock==false && flag_ligar==false) {
+	if(status==CLICOU && tx >= 85 && tx <= 145 && flag_lock==false && flag_ligar==false) {
 		if(ty >= 115 && ty <= 202 ){
 			draw_button_cicle_next(1);			
 		}
 	}
-	if(status==0x20 && tx >= 76 && tx <= 125 && flag_lock==false && flag_porta_lock == false) {
+	if(status==CLICOU && tx >= 76 && tx <= 125 && flag_lock==false && flag_porta_lock == false) {
 		if(ty >= 30 && ty <= 78 ){
 			flag_ligar = !flag_ligar;
 			segundo_cd = tempo_total_seg;
@@ -555,14 +560,14 @@ void update_screen(uint32_t tx, uint32_t ty, uint8_t status) {
 	}
 	if (tx >= 230 && tx <= 294){
 		if(ty >= 20 && ty <= 84 ){
-			if ((status ==0xc0 || status == 0x84 || status == 0x94) && locking_flag == false){
+			if ((status ==SOLTOU_3 || status == SOLTOU_1 || status == SOLTOU_2) && locking_flag == false){
 				//printf("AAAAAAAA");
 				locking_flag = true;
 				lock_seg = segundo_lock;
 			}
 		}
 	}
-	if(status==0x20 && segundo_lock >= lock_seg+3){
+	if(status==CLICOU && segundo_lock >= lock_seg+3){
 		//printf("BBBBBBBBB");
 		if (tx >= 230 && tx <= 294){
 			if(ty >= 20 && ty <= 84 ){
